@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.security.mapper.UserMapper">
+
+  <resultMap id="userMap" type="com.abc.app.engine.security.entity.User">
+    <id property="id" column="USER_ID" />
+    <result property="departmentId" column="DPT_ID" />
+    <result property="username" column="USERNAME" />
+    <result property="password" column="PASSWORD" />
+    <result property="name" column="USER_NAME" />
+    <result property="card" column="USER_CARD" />
+    <result property="code" column="USER_CODE" />
+    <result property="title" column="USER_TITLE" />
+    <result property="gender" column="USER_GENDER" />
+    <result property="birthday" column="USER_BIRTHDAY" />
+    <result property="email" column="USER_EMAIL" />
+    <result property="phone" column="USER_PHONE" />
+    <result property="address" column="USER_ADDR" />
+    <result property="createTime" column="USER_CREATE_TIME" />
+    <result property="updateTime" column="USER_UPDATE_TIME" />
+    <result property="enable" column="USER_ENABLE" />
+    <result property="note" column="USER_NOTE" />
+    <result property="checked" column="USER_CHECKED" />
+    <association property="department" resultMap="com.abc.app.engine.security.mapper.DepartmentMapper.departmentMap" />
+  </resultMap>
+
+  <sql id="findUserColumsSql">
+    USER_ID,USERNAME,PASSWORD,
+    USER_NAME,USER_CARD,USER_CODE,
+    USER_TITLE,USER_GENDER,USER_BIRTHDAY,
+    USER_EMAIL,USER_PHONE,USER_ADDR,
+    USER_CREATE_TIME,USER_UPDATE_TIME,
+    USER_ENABLE,USER_NOTE,
+    DPT_PID,DPT_NAME,DPT_CODE,
+    DPT_PHONE,DPT_ADDR,DPT_ORDER,
+    DPT_ENABLE,DPT_NOTE
+  </sql>
+
+  <!-- 查询用户列表 -->
+  <sql id="findUserListSql">
+    FROM SYS_USER SU,SYS_DPT SD
+    WHERE SU.DPT_ID=SD.DPT_ID
+    <if test="search != null">
+      AND (SU.USERNAME LIKE #{searchAll}
+      OR SU.USER_NAME LIKE #{searchAll}
+      OR SU.USER_CARD LIKE #{searchAll}
+      OR SU.USER_CODE LIKE #{searchAll}
+      OR SU.USER_PHONE LIKE #{searchAll})
+    </if>
+    <if test="departmentId != null">
+      AND SU.DPT_ID=#{departmentId}
+    </if>
+  </sql>
+
+  <select id="findUserList" parameterType="com.abc.app.engine.security.entity.User" resultMap="userMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT SU.DPT_ID,
+    <include refid="findUserColumsSql"></include>
+    <include refid="findUserListSql"></include>
+    <if test="_databaseId == 'oracle'">
+      ORDER BY SU.USER_NAME
+    </if>
+    <if test="_databaseId == 'mysql'">
+      ORDER BY CONVERT(SU.USER_NAME USING GBK)
+    </if>
+    <if test="_databaseId == 'pgsql'">
+      ORDER BY SU.USER_NAME COLLATE "zh-x-icu"
+    </if>
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findUserListCount" parameterType="com.abc.app.engine.security.entity.User" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findUserListSql"></include>
+  </select>
+
+  <!-- 根据ID查询用户 -->
+  <select id="findUserById" parameterType="long" resultMap="userMap">
+    SELECT SU.DPT_ID,
+    <include refid="findUserColumsSql"></include>
+    FROM SYS_USER SU
+    LEFT JOIN SYS_DPT SD ON SU.DPT_ID=SD.DPT_ID
+    WHERE SU.USER_ID=#{val}
+  </select>
+
+  <!-- 根据ID查询用户角色总数 -->
+  <select id="findUserRoleCount" parameterType="long" resultType="long">
+    SELECT COUNT(1) FROM SYS_ROLE_USER WHERE USER_ID=#{val}
+  </select>
+
+  <!-- 根据用户名查询用户 -->
+  <select id="findUserByUsername" parameterType="string" resultMap="userMap">
+    SELECT SU.DPT_ID,
+    <include refid="findUserColumsSql"></include>
+    FROM SYS_USER SU
+    LEFT JOIN SYS_DPT SD ON SU.DPT_ID=SD.DPT_ID
+    WHERE SU.USERNAME=#{val}
+  </select>
+
+  <!-- 添加用户  -->
+  <sql id="insertUserColumnsSql">
+    DPT_ID,USERNAME,PASSWORD,
+    USER_NAME,USER_CARD,USER_CODE,
+    USER_TITLE,USER_GENDER,USER_BIRTHDAY,
+    USER_EMAIL,USER_PHONE,USER_ADDR,
+    USER_CREATE_TIME,USER_ENABLE,USER_NOTE
+  </sql>
+
+  <sql id="insertUserValuesSql">
+    #{departmentId,jdbcType=NUMERIC},#{username,jdbcType=VARCHAR},#{password,jdbcType=VARCHAR},
+    #{name,jdbcType=VARCHAR},#{card,jdbcType=VARCHAR},#{code,jdbcType=VARCHAR},
+    #{title,jdbcType=VARCHAR},#{gender,jdbcType=NUMERIC},#{birthday,jdbcType=TIMESTAMP},
+    #{email,jdbcType=VARCHAR},#{phone,jdbcType=VARCHAR},#{address,jdbcType=VARCHAR},
+    #{createTime,jdbcType=TIMESTAMP},#{enableInt,jdbcType=NUMERIC},#{note,jdbcType=VARCHAR}
+  </sql>
+
+  <insert id="insertUser" parameterType="com.abc.app.engine.security.entity.User" databaseId="oracle">
+    INSERT INTO SYS_USER (USER_ID,<include refid="insertUserColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertUserValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="oracle">
+      SELECT SEQ_SYS_USER.NEXTVAL AS ID FROM DUAL
+    </selectKey>
+  </insert>
+
+  <insert id="insertUser" parameterType="com.abc.app.engine.security.entity.User" databaseId="mysql">
+    INSERT INTO SYS_USER (<include refid="insertUserColumnsSql"></include>)
+    VALUES (<include refid="insertUserValuesSql"></include>)
+    <selectKey resultType="long" order="AFTER" keyProperty="id" databaseId="mysql">
+      SELECT LAST_INSERT_ID() AS ID
+    </selectKey>
+  </insert>
+
+  <insert id="insertUser" parameterType="com.abc.app.engine.security.entity.User" databaseId="pgsql">
+    INSERT INTO SYS_USER (USER_ID,<include refid="insertUserColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertUserValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="pgsql">
+      SELECT NEXTVAL('SEQ_SYS_USER') AS ID
+    </selectKey>
+  </insert>
+
+  <!-- 根据ID修改用户 -->
+  <update id="updateUserById" parameterType="com.abc.app.engine.security.entity.User">
+    UPDATE SYS_USER SET DPT_ID=#{departmentId,jdbcType=NUMERIC},USERNAME=#{username,jdbcType=VARCHAR},
+    USER_NAME=#{name,jdbcType=VARCHAR},USER_CARD=#{card,jdbcType=VARCHAR},USER_CODE=#{code,jdbcType=VARCHAR},
+    USER_TITLE=#{title,jdbcType=VARCHAR},USER_GENDER=#{gender,jdbcType=NUMERIC},USER_BIRTHDAY=#{birthday,jdbcType=TIMESTAMP},
+    USER_EMAIL=#{email,jdbcType=VARCHAR},USER_PHONE=#{phone,jdbcType=VARCHAR},USER_ADDR=#{address,jdbcType=VARCHAR},
+    USER_UPDATE_TIME=#{updateTime,jdbcType=TIMESTAMP},USER_ENABLE=#{enableInt,jdbcType=NUMERIC},USER_NOTE=#{note,jdbcType=VARCHAR}
+    WHERE USER_ID=#{id}
+  </update>
+
+  <!-- 根据ID删除用户 -->
+  <delete id="deleteUserById" parameterType="long">
+    DELETE FROM SYS_USER WHERE USER_ID=#{val}
+  </delete>
+
+  <!-- 根据ID修改密码 -->
+  <update id="updatePasswordById" parameterType="com.abc.app.engine.security.entity.User">
+    UPDATE SYS_USER SET PASSWORD=#{password} WHERE USER_ID=#{id}
+  </update>
+
+  <!-- 根据ID批量修改密码 -->
+  <update id="updatePasswordByIds" parameterType="com.abc.app.engine.security.entity.Password">
+    UPDATE SYS_USER SET PASSWORD=#{now}
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      AND USER_ID IN
+      <foreach item="item" collection="ids" separator="," open="(" close=")">
+        #{item}
+      </foreach>
+    </trim>
+  </update>
+
+</mapper>

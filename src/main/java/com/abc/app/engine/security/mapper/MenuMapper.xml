@@ -1,0 +1,185 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.security.mapper.MenuMapper">
+
+  <resultMap id="menuMap" type="com.abc.app.engine.security.entity.Menu">
+    <id property="id" column="MENU_ID" />
+    <result property="parentId" column="MENU_PID" />
+    <result property="name" column="MENU_NAME" />
+    <result property="url" column="MENU_URL" />
+    <result property="matIcon" column="MENU_MAT_ICON" />
+    <result property="antdIcon" column="MENU_ANTD_ICON" />
+    <result property="antdIconTheme" column="MENU_ANTD_ICON_THEME" />
+    <result property="antdIconTwotone" column="MENU_ANTD_ICON_TWOTONE" />
+    <result property="order" column="MENU_ORDER" />
+    <result property="enable" column="MENU_ENABLE" />
+    <result property="note" column="MENU_NOTE" />
+    <result property="checked" column="MENU_CHECKED" />
+  </resultMap>
+
+  <!-- 查询菜单列表 -->
+  <sql id="findMenuListSql">
+    FROM SYS_MENU
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND (MENU_NAME LIKE #{searchAll}
+        OR MENU_URL LIKE #{searchAll})
+      </if>
+      <if test="enable != null">
+        AND MENU_ENABLE=#{enableInt}
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findMenuList" parameterType="com.abc.app.engine.security.entity.Menu" resultMap="menuMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findMenuListSql"></include>
+    ORDER BY MENU_ORDER
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findMenuListCount" parameterType="com.abc.app.engine.security.entity.Menu" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findMenuListSql"></include>
+  </select>
+
+  <!-- 根据菜单ID查询菜单 -->
+  <select id="findMenuById" parameterType="long" resultMap="menuMap">
+    SELECT * FROM SYS_MENU WHERE MENU_ID=#{val}
+  </select>
+
+  <!-- 根据菜单父ID查询子级总数 -->
+  <select id="findMenuChildrenCount" parameterType="long" resultType="long">
+    SELECT COUNT(1) FROM SYS_MENU WHERE MENU_PID=#{val}
+  </select>
+
+  <!-- 根据菜单ID查询菜单关联角色总数 -->
+  <select id="findMenuRoleCount" parameterType="long" resultType="long">
+    SELECT COUNT(1) FROM SYS_ROLE_MENU WHERE MENU_ID=#{val}
+  </select>
+
+  <!-- 根据菜单父ID查询子级总数 -->
+  <select id="findMenuChildrenMaxOrder" parameterType="com.abc.app.engine.security.entity.Menu" resultType="string">
+    SELECT MAX(MENU_ORDER) FROM SYS_MENU
+    WHERE MENU_PID=#{parentId} AND (#{parentId}!=0 OR MENU_ORDER!=#{orderTopMax})
+  </select>
+
+  <!-- 查询用户菜单 -->
+  <select id="findMenuListByUsername" parameterType="string" resultMap="menuMap">
+    SELECT SM.* FROM SYS_MENU SM WHERE SM.MENU_ENABLE=1 AND EXISTS
+    (SELECT 1 FROM SYS_ROLE_MENU SRM,SYS_ROLE SR,SYS_ROLE_USER SRU,SYS_USER SU
+    WHERE SM.MENU_ID=SRM.MENU_ID AND SRM.ROLE_ID=SR.ROLE_ID AND SR.ROLE_ID=SRU.ROLE_ID
+    AND SRU.USER_ID=SU.USER_ID AND SR.ROLE_ENABLE=1 AND SU.USER_ENABLE=1
+    AND SU.USERNAME=#{val}) ORDER BY SM.MENU_ORDER
+  </select>
+
+  <!-- 添加菜单 -->
+  <sql id="insertMenuColumnsSql">
+    MENU_PID,MENU_NAME,MENU_URL,
+    MENU_MAT_ICON,MENU_ANTD_ICON,
+    MENU_ANTD_ICON_THEME,MENU_ANTD_ICON_TWOTONE,
+    MENU_ORDER,MENU_ENABLE,MENU_NOTE
+  </sql>
+
+  <sql id="insertMenuValuesSql">
+    #{parentId,jdbcType=NUMERIC},#{name,jdbcType=VARCHAR},#{url,jdbcType=VARCHAR},
+    #{matIcon,jdbcType=VARCHAR},#{antdIcon,jdbcType=VARCHAR},
+    #{antdIconTheme,jdbcType=VARCHAR},#{antdIconTwotone,jdbcType=VARCHAR},
+    #{order,jdbcType=VARCHAR},#{enableInt,jdbcType=NUMERIC},#{note,jdbcType=VARCHAR}
+  </sql>
+
+  <insert id="insertMenu" parameterType="com.abc.app.engine.security.entity.Menu" databaseId="oracle">
+    INSERT INTO SYS_MENU (MENU_ID,<include refid="insertMenuColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertMenuValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="oracle">
+      SELECT SEQ_SYS_MENU.NEXTVAL AS ID FROM DUAL
+    </selectKey>
+  </insert>
+
+  <insert id="insertMenu" parameterType="com.abc.app.engine.security.entity.Menu" databaseId="mysql">
+    INSERT INTO SYS_MENU (<include refid="insertMenuColumnsSql"></include>)
+    VALUES (<include refid="insertMenuValuesSql"></include>)
+    <selectKey resultType="long" order="AFTER" keyProperty="id" databaseId="mysql">
+      SELECT LAST_INSERT_ID() AS ID
+    </selectKey>
+  </insert>
+
+  <insert id="insertMenu" parameterType="com.abc.app.engine.security.entity.Menu" databaseId="pgsql">
+    INSERT INTO SYS_MENU (MENU_ID,<include refid="insertMenuColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertMenuValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="pgsql">
+      SELECT NEXTVAL('SEQ_SYS_MENU') AS ID
+    </selectKey>
+  </insert>
+
+  <!-- 根据菜单ID修改菜单  -->
+  <update id="updateMenuById" parameterType="com.abc.app.engine.security.entity.Menu">
+    UPDATE SYS_MENU SET
+    MENU_NAME=#{name,jdbcType=VARCHAR},MENU_URL=#{url,jdbcType=VARCHAR},
+    MENU_MAT_ICON=#{matIcon,jdbcType=VARCHAR},MENU_ANTD_ICON=#{antdIcon,jdbcType=VARCHAR},
+    MENU_ANTD_ICON_THEME=#{antdIconTheme,jdbcType=VARCHAR},MENU_ANTD_ICON_TWOTONE=#{antdIconTwotone,jdbcType=VARCHAR},
+    MENU_ENABLE=#{enableInt,jdbcType=NUMERIC},MENU_NOTE=#{note,jdbcType=VARCHAR}
+    WHERE MENU_ID=#{id}
+  </update>
+
+  <!-- 根据菜单ID删除菜单 -->
+  <delete id="deleteMenuById" parameterType="long">
+    DELETE FROM SYS_MENU WHERE MENU_ID=#{val}
+  </delete>
+
+  <!-- 根据菜单排序查询菜单列表 -->
+  <select id="findMenuListByOrder" parameterType="com.abc.app.engine.security.entity.Menu" resultMap="menuMap">
+    SELECT * FROM SYS_MENU
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="!order.startsWith(orderTopMax)">
+        AND MENU_ORDER NOT LIKE #{orderTopMaxRight}
+      </if>
+      <if test="parentOrder != null">
+        AND MENU_ORDER LIKE #{parentOrderRight}
+      </if>
+      <if test="order != null">
+        AND MENU_ORDER<![CDATA[>]]>#{order}
+      </if>
+    </trim>
+    ORDER BY MENU_ORDER
+  </select>
+
+  <!-- 根据菜单ID更新菜单排序 -->
+  <update id="updateMenuOrderById" parameterType="list">
+    UPDATE SYS_MENU
+    <trim prefix="SET" suffixOverrides=",">
+      <trim prefix="MENU_ORDER=CASE" suffix="END,">
+        <foreach item="subList" collection="list">
+          <foreach item="item" collection="subList">
+            WHEN MENU_ID=#{item.id} THEN #{item.order}
+          </foreach>
+        </foreach>
+      </trim>
+    </trim>
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <foreach item="subList" collection="list">
+        OR MENU_ID IN
+        <foreach item="item" collection="subList" separator="," open="(" close=")">
+          #{item.id}
+        </foreach>
+      </foreach>
+    </trim>
+  </update>
+
+</mapper>

@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.common.mapper.DictMapper">
+
+  <resultMap id="dictMap" type="com.abc.app.engine.common.entity.Dict">
+    <id property="id" column="DICT_ID" />
+    <result property="type" column="DICT_TYPE" />
+    <result property="name" column="DICT_NAME" />
+    <result property="order" column="DICT_ORDER" />
+    <result property="enable" column="DICT_ENABLE" />
+    <result property="note" column="DICT_NOTE" />
+  </resultMap>
+
+  <resultMap id="dictOptionMap" type="com.abc.app.engine.common.entity.DictOption">
+    <id property="dictId" column="DICT_ID" />
+    <id property="id" column="DICT_OPT_ID" />
+    <result property="name" column="DICT_OPT_NAME" />
+    <result property="code" column="DICT_OPT_CODE" />
+    <result property="order" column="DICT_OPT_ORDER" />
+    <result property="enable" column="DICT_OPT_ENABLE" />
+    <result property="note" column="DICT_OPT_NOTE" />
+    <association property="dict" resultMap="dictMap" />
+  </resultMap>
+
+  <sql id="dictColumnsSql">
+    DICT_TYPE,DICT_NAME,
+    DICT_ORDER,DICT_ENABLE,DICT_NOTE
+  </sql>
+
+  <sql id="dictOptionColumnsSql">
+    DICT_OPT_ID,DICT_OPT_NAME,DICT_OPT_CODE,
+    DICT_OPT_ORDER,DICT_OPT_ENABLE,DICT_OPT_NOTE
+  </sql>
+
+  <!-- 查询字典列表 -->
+  <sql id="findDictListSql">
+    FROM SYS_DICT
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND DICT_NAME LIKE #{searchAll}
+      </if>
+      <if test="type != null">
+        AND DICT_TYPE=#{type}
+      </if>
+      <if test="enable != null">
+        AND DICT_ENABLE=#{enableInt}
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findDictList" parameterType="com.abc.app.engine.common.entity.Dict" resultMap="dictMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT DICT_ID,
+    <include refid="dictColumnsSql"></include>
+    <include refid="findDictListSql"></include>
+    ORDER BY DICT_ORDER
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findDictListCount" parameterType="com.abc.app.engine.common.entity.Dict" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findDictListSql" />
+  </select>
+
+  <!-- 查询字典项列表 -->
+  <sql id="findDictOptionListSql">
+    FROM SYS_DICT SD,SYS_DICT_OPT SDO
+    WHERE SD.DICT_ID=SDO.DICT_ID
+    <if test="dictId != null">
+      AND SD.DICT_ID=#{dictId}
+    </if>
+    <if test="search != null">
+      AND (SDO.DICT_OPT_NAME LIKE #{searchAll}
+      OR SDO.DICT_OPT_CODE LIKE #{searchAll})
+    </if>
+    <if test="enable != null">
+      AND SD.DICT_ENABLE=#{enableInt}
+      AND SDO.DICT_OPT_ENABLE=#{enableInt}
+    </if>
+  </sql>
+
+  <select id="findDictOptionList" parameterType="com.abc.app.engine.common.entity.DictOption" resultMap="dictOptionMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT SD.DICT_ID AS DICT_ID,
+    <include refid="dictColumnsSql"></include>,
+    <include refid="dictOptionColumnsSql"></include>
+    <include refid="findDictOptionListSql"></include>
+    ORDER BY SD.DICT_ORDER,SDO.DICT_OPT_ORDER
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findDictOptionListCount" parameterType="com.abc.app.engine.common.entity.DictOption" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findDictOptionListSql" />
+  </select>
+
+  <!-- 根据字典ID查询字典 -->
+  <select id="findDictById" parameterType="long" resultMap="dictMap">
+    SELECT DICT_ID,
+    <include refid="dictColumnsSql"></include>
+    FROM SYS_DICT WHERE DICT_ID=#{val}
+  </select>
+
+  <!-- 根据字典项ID查询字典项 -->
+  <select id="findDictOptionById" parameterType="com.abc.app.engine.common.entity.DictOption" resultMap="dictOptionMap" >
+    SELECT SD.DICT_ID AS DICT_ID,
+    <include refid="dictColumnsSql"></include>,
+    <include refid="dictOptionColumnsSql"></include>
+    FROM SYS_DICT SD,SYS_DICT_OPT SDO
+    WHERE SD.DICT_ID=SDO.DICT_ID
+    AND SD.DICT_ID=#{dictId}
+    AND SDO.DICT_OPT_ID=#{id}
+  </select>
+
+  <!-- 根据字典ID查询字典项总数 -->
+  <select id="findDictOptionCount" parameterType="long" resultType="long">
+    SELECT COUNT(1) FROM SYS_DICT_OPT WHERE DICT_ID=#{val} 
+  </select>
+
+  <!-- 插入字典 -->
+  <insert id="insertDict" parameterType="com.abc.app.engine.common.entity.Dict">
+    INSERT INTO SYS_DICT (DICT_ID,<include refid="dictColumnsSql"></include>)
+    VALUES (#{id,jdbcType=NUMERIC},#{type,jdbcType=NUMERIC},#{name,jdbcType=VARCHAR},
+    #{order,jdbcType=NUMERIC},#{enableInt,jdbcType=NUMERIC},#{note,jdbcType=VARCHAR})
+  </insert>
+
+  <!-- 插入字典项 -->
+  <insert id="insertDictOption" parameterType="com.abc.app.engine.common.entity.DictOption">
+    INSERT INTO SYS_DICT_OPT (DICT_ID,<include refid="dictOptionColumnsSql"></include>)
+    VALUES (#{dictId,jdbcType=NUMERIC},#{id,jdbcType=NUMERIC},
+    #{name,jdbcType=VARCHAR},#{code,jdbcType=VARCHAR},#{order,jdbcType=NUMERIC},
+    #{enableInt,jdbcType=NUMERIC},#{note,jdbcType=VARCHAR})
+  </insert>
+
+  <!-- 根据字典ID更新字典 -->
+  <update id="updateDictById" parameterType="com.abc.app.engine.common.entity.Dict">
+    UPDATE SYS_DICT SET DICT_ID=#{id,jdbcType=NUMERIC},DICT_NAME=#{name,jdbcType=VARCHAR},
+    DICT_ORDER=#{order,jdbcType=NUMERIC},DICT_ENABLE=#{enableInt,jdbcType=NUMERIC},
+    DICT_NOTE=#{note,jdbcType=VARCHAR} WHERE DICT_ID=#{oldId,jdbcType=NUMERIC}
+  </update>
+
+  <!-- 根据字典项ID更新字典项 -->
+  <update id="updateDictOptionById" parameterType="com.abc.app.engine.common.entity.DictOption">
+    UPDATE SYS_DICT_OPT SET DICT_OPT_ID=#{id,jdbcType=NUMERIC},DICT_OPT_NAME=#{name,jdbcType=VARCHAR},
+    DICT_OPT_CODE=#{code,jdbcType=VARCHAR},DICT_OPT_ORDER=#{order,jdbcType=NUMERIC},
+    DICT_OPT_ENABLE=#{enableInt,jdbcType=NUMERIC},DICT_OPT_NOTE=#{note,jdbcType=VARCHAR}
+    WHERE DICT_ID=#{dictId,jdbcType=NUMERIC} AND DICT_OPT_ID=#{oldId,jdbcType=NUMERIC} 
+  </update>
+
+  <!-- 根据字典ID删除字典 -->
+  <delete id="deleteDictById" parameterType="long">
+    DELETE FROM SYS_DICT WHERE DICT_ID=#{val}
+  </delete>
+
+  <!-- 根据字典ID和字典项ID删除字典项 -->
+  <delete id="deleteDictOptionById" parameterType="com.abc.app.engine.common.entity.DictOption">
+    DELETE FROM SYS_DICT_OPT WHERE DICT_ID=#{dictId} AND DICT_OPT_ID=#{id}
+  </delete>
+
+</mapper>

@@ -1,0 +1,113 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.security.mapper.MenuLogMapper">
+
+  <resultMap id="menuLogMap" type="com.abc.app.engine.security.entity.MenuLog">
+    <id property="logId" column="LOG_ID" />
+    <result property="logType" column="LOG_TYPE" />
+    <result property="logTime" column="LOG_TIME" />
+    <result property="logUser" column="LOG_USER" />
+    <association property="menu" resultMap="com.abc.app.engine.security.mapper.MenuMapper.menuMap" />
+  </resultMap>
+
+  <!-- 查询菜单日志列表 -->
+  <sql id="findMenuLogListSql">
+    FROM SYS_MENU_LOG
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND (MENU_NAME LIKE #{searchAll}
+        OR MENU_URL LIKE #{searchAll})
+      </if>
+      <if test="id != null">
+        AND MENU_ID=#{id}
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findMenuLogList" parameterType="com.abc.app.engine.security.entity.MenuLog" resultMap="menuLogMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findMenuLogListSql"></include>
+    ORDER BY LOG_TIME DESC
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findMenuLogListCount" parameterType="com.abc.app.engine.security.entity.MenuLog" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findMenuLogListSql"></include>
+  </select>
+
+  <!-- 根据菜单日志ID查询菜单日志 -->
+  <select id="findMenuLogByLogId" parameterType="long" resultMap="menuLogMap">
+    SELECT * FROM SYS_MENU_LOG WHERE LOG_ID=#{val}
+  </select>
+
+  <!-- 添加菜单日志 -->
+  <sql id="insertMenuLogsColumnsSql">
+    LOG_TYPE,LOG_TIME,LOG_USER,
+    MENU_ID,MENU_PID,MENU_NAME,MENU_URL,
+    MENU_MAT_ICON,MENU_ANTD_ICON,
+    MENU_ANTD_ICON_THEME,MENU_ANTD_ICON_TWOTONE,
+    MENU_ORDER,MENU_ENABLE,MENU_NOTE
+  </sql>
+
+  <sql id="insertMenuLogsValuesSql">
+    #{logType,jdbcType=VARCHAR},
+    #{logTime,jdbcType=TIMESTAMP},
+    #{logUser,jdbcType=VARCHAR},
+    MENU_ID,MENU_PID,MENU_NAME,MENU_URL,
+    MENU_MAT_ICON,MENU_ANTD_ICON,
+    MENU_ANTD_ICON_THEME,MENU_ANTD_ICON_TWOTONE,
+    MENU_ORDER,MENU_ENABLE,MENU_NOTE
+  </sql>
+
+  <sql id="insertMenuLogsWhereSql">
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="ids == null">
+        AND MENU_ID=#{id}
+      </if>
+      <if test="ids != null">
+        <foreach item="subList" collection="ids">
+          OR MENU_ID IN
+          <foreach item="item" collection="subList" separator="," open="(" close=")">
+            #{item}
+          </foreach>
+        </foreach>
+      </if>
+    </trim>
+  </sql>
+
+  <insert id="insertMenuLogs" parameterType="com.abc.app.engine.security.entity.MenuLog" databaseId="oracle">
+    INSERT INTO SYS_MENU_LOG (LOG_ID,<include refid="insertMenuLogsColumnsSql"></include>)
+    SELECT SEQ_SYS_MENU_LOG.NEXTVAL,<include refid="insertMenuLogsValuesSql"></include>
+    FROM SYS_MENU <include refid="insertMenuLogsWhereSql"></include>
+  </insert>
+
+  <insert id="insertMenuLogs" parameterType="com.abc.app.engine.security.entity.MenuLog" databaseId="mysql">
+    INSERT INTO SYS_MENU_LOG (<include refid="insertMenuLogsColumnsSql"></include>)
+    SELECT <include refid="insertMenuLogsValuesSql"></include>
+    FROM SYS_MENU <include refid="insertMenuLogsWhereSql"></include>
+  </insert>
+
+  <insert id="insertMenuLogs" parameterType="com.abc.app.engine.security.entity.MenuLog" databaseId="pgsql">
+    INSERT INTO SYS_MENU_LOG (LOG_ID,<include refid="insertMenuLogsColumnsSql"></include>)
+    SELECT NEXTVAL('SEQ_SYS_MENU_LOG'),<include refid="insertMenuLogsValuesSql"></include>
+    FROM SYS_MENU <include refid="insertMenuLogsWhereSql"></include>
+  </insert>
+
+</mapper>

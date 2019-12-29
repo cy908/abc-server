@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    platform: postgresql
+    driver-class-name: org.postgresql.Driver
+    url: jdbc:postgresql://127.0.0.1:5432/myabc
+    username: postgres
+    password: pgsql
+    schema: classpath:db/schema-pgsql.sql
+    data: classpath:db/data.sql
+    initialization-mode: never
+    continue-on-error: true

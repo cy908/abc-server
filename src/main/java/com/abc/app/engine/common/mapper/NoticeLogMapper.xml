@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.common.mapper.NoticeLogMapper">
+
+  <resultMap id="noticeLogMap" type="com.abc.app.engine.common.entity.NoticeLog">
+    <id property="logId" column="LOG_ID" />
+    <result property="logType" column="LOG_TYPE" />
+    <result property="logTime" column="LOG_TIME" />
+    <result property="logUser" column="LOG_USER" />
+    <association property="notice" resultMap="com.abc.app.engine.common.mapper.NoticeMapper.noticeMap" />
+  </resultMap>
+
+  <!-- 查询通知日志列表 -->
+  <sql id="findNoticeLogListSql">
+    FROM SYS_NOTICE_LOG
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="notice != null">
+        <if test="notice.search != null">
+          AND NOTICE_TITLE LIKE #{notice.searchAll}
+        </if>
+        <if test="notice.id != null">
+          AND NOTICE_ID=#{notice.id}
+        </if>
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findNoticeLogList" parameterType="com.abc.app.engine.common.entity.NoticeLog" resultMap="noticeLogMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findNoticeLogListSql"></include>
+    ORDER BY LOG_TIME DESC
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findNoticeLogListCount" parameterType="com.abc.app.engine.common.entity.NoticeLog" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findNoticeLogListSql"></include>
+  </select>
+
+  <!-- 根据通知日志ID查询通知日志 -->
+  <select id="findNoticeLogByLogId" parameterType="long" resultMap="noticeLogMap">
+    SELECT * FROM SYS_NOTICE_LOG WHERE LOG_ID=#{val}
+  </select>
+
+  <!-- 根据通知日志ID查询通知部门列表 -->
+  <select id="findNoticeDepartmentListByLogId" parameterType="long" resultMap="com.abc.app.engine.common.mapper.NoticeMapper.noticeDepartmentMap">
+    SELECT * FROM SYS_NOTICE_DPT_LOG WHERE LOG_ID=#{val}
+  </select>
+
+  <!-- 添加通知日志 -->
+  <sql id="insertNoticeLogColumnsSql">
+    LOG_TYPE,LOG_TIME,LOG_USER,
+    NOTICE_ID,NOTICE_TITLE,NOTICE_CONTENT,
+    NOTICE_START_TIME,NOTICE_END_TIME,
+    NOTICE_CREATE_TIME,NOTICE_UPDATE_TIME
+  </sql>
+
+  <sql id="insertNoticeLogValuesSql">
+    #{logType,jdbcType=VARCHAR},
+    #{logTime,jdbcType=TIMESTAMP},
+    #{logUser,jdbcType=VARCHAR},
+    NOTICE_ID,NOTICE_TITLE,NOTICE_CONTENT,
+    NOTICE_START_TIME,NOTICE_END_TIME,
+    NOTICE_CREATE_TIME,NOTICE_UPDATE_TIME
+  </sql>
+
+  <sql id="insertNoticeLogWhereSql">
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="ids == null">
+        AND NOTICE_ID=#{id}
+      </if>
+      <if test="ids != null">
+        AND NOTICE_ID IN
+        <foreach item="item" collection="ids" separator="," open="(" close=")">
+          #{item}
+        </foreach>
+      </if>
+    </trim>
+  </sql>
+
+  <insert id="insertNoticeLog" parameterType="com.abc.app.engine.common.entity.NoticeLog" databaseId="oracle">
+    INSERT INTO SYS_NOTICE_LOG (LOG_ID,<include refid="insertNoticeLogColumnsSql"></include>)
+    SELECT SEQ_SYS_NOTICE_LOG.NEXTVAL,<include refid="insertNoticeLogValuesSql"></include>
+    FROM SYS_NOTICE <include refid="insertNoticeLogWhereSql"></include>
+    <selectKey resultType="long" order="AFTER" keyProperty="logId" databaseId="oracle">
+      SELECT SEQ_SYS_NOTICE_LOG.CURRVAL AS LOG_ID FROM DUAL
+    </selectKey>
+  </insert>
+
+  <insert id="insertNoticeLog" parameterType="com.abc.app.engine.common.entity.NoticeLog" databaseId="mysql">
+    INSERT INTO SYS_NOTICE_LOG (<include refid="insertNoticeLogColumnsSql"></include>)
+    SELECT <include refid="insertNoticeLogValuesSql"></include>
+    FROM SYS_NOTICE <include refid="insertNoticeLogWhereSql"></include>
+    <selectKey resultType="long" order="AFTER" keyProperty="logId" databaseId="mysql">
+      SELECT LAST_INSERT_ID() AS LOG_ID
+    </selectKey>
+  </insert>
+
+  <insert id="insertNoticeLog" parameterType="com.abc.app.engine.common.entity.NoticeLog" databaseId="pgsql">
+    INSERT INTO SYS_NOTICE_LOG (LOG_ID,<include refid="insertNoticeLogColumnsSql"></include>)
+    SELECT NEXTVAL('SEQ_SYS_NOTICE_LOG'),<include refid="insertNoticeLogValuesSql"></include>
+    FROM SYS_NOTICE <include refid="insertNoticeLogWhereSql"></include>
+    <selectKey resultType="long" order="AFTER" keyProperty="logId" databaseId="pgsql">
+      SELECT CURRVAL('SEQ_SYS_NOTICE_LOG') AS LOG_ID
+    </selectKey>
+  </insert>
+
+  <!-- 添加通知部门日志 -->
+  <insert id="insertNoticeDepartmentLog" parameterType="com.abc.app.engine.common.entity.NoticeLog">
+    INSERT INTO SYS_NOTICE_DPT_LOG (LOG_ID,NOTICE_ID,DPT_ID)
+    SELECT #{logId,jdbcType=NUMERIC},NOTICE_ID,DPT_ID
+    FROM SYS_NOTICE_DPT
+    <include refid="insertNoticeLogWhereSql"></include>
+  </insert>
+
+</mapper>

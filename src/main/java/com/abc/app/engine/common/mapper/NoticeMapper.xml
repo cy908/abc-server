@@ -1,0 +1,141 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.common.mapper.NoticeMapper">
+
+  <resultMap id="noticeMap" type="com.abc.app.engine.common.entity.Notice">
+    <id property="id" column="NOTICE_ID" />
+    <result property="title" column="NOTICE_TITLE" />
+    <result property="content" column="NOTICE_CONTENT" />
+    <result property="startTime" column="NOTICE_START_TIME" />
+    <result property="endTime" column="NOTICE_END_TIME" />
+    <result property="createTime" column="NOTICE_CREATE_TIME" />
+    <result property="updateTime" column="NOTICE_UPDATE_TIME" />
+  </resultMap>
+
+  <resultMap id="noticeDepartmentMap" type="com.abc.app.engine.common.entity.NoticeDepartment">
+    <result property="noticeId" column="NOTICE_ID" />
+    <result property="departmentId" column="DPT_ID" />
+  </resultMap>
+
+  <!-- 查询通知列表 -->
+  <sql id="findNoticeListSql">
+    FROM SYS_NOTICE
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND NOTICE_TITLE LIKE #{searchAll}
+      </if>
+      <if test="startTime != null and endTime !=null">
+        AND NOTICE_START_TIME<![CDATA[<]]>#{startTime}
+        AND #{endTime}<![CDATA[<]]>NOTICE_END_TIME
+      </if>
+      <if test="departmentId != null">
+        AND NOTICE_ID IN (SELECT NOTICE_ID
+        FROM SYS_NOTICE_DPT
+        WHERE DPT_ID=#{departmentId})
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findNoticeList" parameterType="com.abc.app.engine.common.entity.Notice" resultMap="noticeMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findNoticeListSql"></include>
+    ORDER BY NOTICE_UPDATE_TIME DESC
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findNoticeListCount" parameterType="com.abc.app.engine.common.entity.Notice" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findNoticeListSql"></include>
+  </select>
+
+  <!-- 根据通知ID查询通知 -->
+  <select id="findNoticeById" parameterType="long" resultMap="noticeMap">
+    SELECT * FROM SYS_NOTICE WHERE NOTICE_ID=#{id}
+  </select>
+
+  <!-- 根据通知ID查询通知部门列表 -->
+  <select id="findNoticeDepartmentListById" parameterType="long" resultMap="noticeDepartmentMap">
+    SELECT * FROM SYS_NOTICE_DPT WHERE NOTICE_ID=#{id}
+  </select>
+
+  <!-- 添加通知 -->
+  <sql id="insertNoticeColumnsSql">
+    NOTICE_TITLE,NOTICE_CONTENT,
+    NOTICE_START_TIME,NOTICE_END_TIME,
+    NOTICE_CREATE_TIME
+  </sql>
+
+  <sql id="insertNoticeValuesSql">
+    #{title,jdbcType=VARCHAR},#{content,jdbcType=VARCHAR},
+    #{startTime,jdbcType=TIMESTAMP},#{endTime,jdbcType=TIMESTAMP},
+    #{createTime,jdbcType=TIMESTAMP}
+  </sql>
+
+  <insert id="insertNotice" parameterType="com.abc.app.engine.common.entity.Notice" databaseId="oracle">
+    INSERT INTO SYS_NOTICE (NOTICE_ID,<include refid="insertNoticeColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertNoticeValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="oracle">
+      SELECT SEQ_SYS_NOTICE.NEXTVAL AS ID FROM DUAL
+    </selectKey>
+  </insert>
+
+  <insert id="insertNotice" parameterType="com.abc.app.engine.common.entity.Notice" databaseId="mysql">
+    INSERT INTO SYS_NOTICE (<include refid="insertNoticeColumnsSql"></include>)
+    VALUES (<include refid="insertNoticeValuesSql"></include>)
+    <selectKey resultType="long" order="AFTER" keyProperty="id" databaseId="mysql">
+      SELECT LAST_INSERT_ID() AS ID
+    </selectKey>
+  </insert>
+
+  <insert id="insertNotice" parameterType="com.abc.app.engine.common.entity.Notice" databaseId="pgsql">
+    INSERT INTO SYS_NOTICE (NOTICE_ID,<include refid="insertNoticeColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertNoticeValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="pgsql">
+      SELECT NEXTVAL('SEQ_SYS_NOTICE') AS ID
+    </selectKey>
+  </insert>
+
+  <!-- 添加通知部门 -->
+  <insert id="insertNoticeDepartment" parameterType="list">
+    INSERT INTO SYS_NOTICE_DPT (NOTICE_ID,DPT_ID)  VALUES 
+    <foreach item="item" index="index" collection="list" separator=",">
+      (#{item.noticeId},#{item.departmentId})
+    </foreach>
+  </insert>
+
+  <!-- 根据通知ID修改通知 -->
+  <update id="updateNoticeById" parameterType="com.abc.app.engine.common.entity.Notice">
+    UPDATE SYS_NOTICE SET
+    NOTICE_TITLE=#{title,jdbcType=VARCHAR},NOTICE_CONTENT=#{content,jdbcType=VARCHAR},
+    NOTICE_START_TIME=#{startTime,jdbcType=TIMESTAMP},NOTICE_END_TIME=#{endTime,jdbcType=TIMESTAMP},
+    NOTICE_UPDATE_TIME=#{updateTime,jdbcType=TIMESTAMP}
+    WHERE NOTICE_ID=#{id,jdbcType=NUMERIC}
+  </update>
+
+  <!-- 根据通知ID删除通知 -->
+  <delete id="deleteNoticeById" parameterType="long">
+    DELETE FROM SYS_NOTICE WHERE NOTICE_ID=#{id}
+  </delete>
+
+  <!-- 根据通知ID删除通知部门 -->
+  <delete id="deleteNoticeDepartmentById" parameterType="long">
+    DELETE FROM SYS_NOTICE_DPT WHERE NOTICE_ID=#{id}
+  </delete>
+
+</mapper>

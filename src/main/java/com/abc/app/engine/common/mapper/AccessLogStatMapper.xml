@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.common.mapper.AccessLogStatMapper">
+
+  <resultMap id="accessLogStatMap" type="com.abc.app.engine.common.entity.AccessLogStat">
+    <result property="accessTime" column="LOG_ACCESS_TIME" />
+    <result property="accessPV" column="LOG_ACCESS_PV" />
+    <result property="accessIP" column="LOG_ACCESS_IP" />
+  </resultMap>
+
+  <!-- 查询访问日志统计列表 -->
+  <select id="findAccessLogStatList" parameterType="com.abc.app.engine.common.entity.AccessLogStat" resultMap="accessLogStatMap">
+    SELECT LOG_ACCESS_TIME,COUNT(1) AS LOG_ACCESS_PV,
+    COUNT(DISTINCT LOG_ACCESS_IP) AS LOG_ACCESS_IP
+    FROM (SELECT LOG_ACCESS_IP,
+    <if test="_databaseId == 'oracle'">
+      <if test="statType == 'byYear'">
+        TO_DATE(CONCAT(TO_CHAR(LOG_ACCESS_TIME,'YYYY'),'0101'),'YYYYMMDD')
+      </if>
+      <if test="statType == 'byMonth'">
+        TO_DATE(CONCAT(TO_CHAR(LOG_ACCESS_TIME,'YYYYMM'),'01'),'YYYYMMDD')
+      </if>
+      <if test="statType == 'byDay'">
+        TO_DATE(TO_CHAR(LOG_ACCESS_TIME,'YYYYMMDD'),'YYYYMMDD')
+      </if>
+      <if test="statType == 'byHour'">
+        TO_DATE(TO_CHAR(LOG_ACCESS_TIME,'YYYYMMDDHH24'),'YYYYMMDDHH24')
+      </if>
+      <if test="statType == 'byMinute'">
+        TO_DATE(TO_CHAR(LOG_ACCESS_TIME,'YYYYMMDDHH24MI'),'YYYYMMDDHH24MI')
+      </if>
+      AS LOG_ACCESS_TIME
+    </if>
+    <if test="_databaseId == 'mysql'">
+      <if test="statType == 'byYear'">
+        STR_TO_DATE(CONCAT(DATE_FORMAT(LOG_ACCESS_TIME,'%Y'),'0101'),'%Y%m%d')
+      </if>
+      <if test="statType == 'byMonth'">
+        STR_TO_DATE(CONCAT(DATE_FORMAT(LOG_ACCESS_TIME,'%Y%m'),'01'),'%Y%m%d')
+      </if>
+      <if test="statType == 'byDay'">
+        STR_TO_DATE(DATE_FORMAT(LOG_ACCESS_TIME,'%Y%m%d'),'%Y%m%d')
+      </if>
+      <if test="statType == 'byHour'">
+        STR_TO_DATE(DATE_FORMAT(LOG_ACCESS_TIME,'%Y%m%d%H'),'%Y%m%d%H')
+      </if>
+      <if test="statType == 'byMinute'">
+        STR_TO_DATE(DATE_FORMAT(LOG_ACCESS_TIME,'%Y%m%d%H%i'),'%Y%m%d%H%i')
+      </if>
+      AS LOG_ACCESS_TIME
+    </if>
+    <if test="_databaseId == 'pgsql'">
+      <if test="statType == 'byYear'">
+        TO_TIMESTAMP(CONCAT(TO_CHAR(LOG_ACCESS_TIME,'YYYY'),'0101'),'YYYYMMDD')
+      </if>
+      <if test="statType == 'byMonth'">
+        TO_TIMESTAMP(CONCAT(TO_CHAR(LOG_ACCESS_TIME,'YYYYMM'),'01'),'YYYYMMDD')
+      </if>
+      <if test="statType == 'byDay'">
+        TO_TIMESTAMP(TO_CHAR(LOG_ACCESS_TIME,'YYYYMMDD'),'YYYYMMDD')
+      </if>
+      <if test="statType == 'byHour'">
+        TO_TIMESTAMP(TO_CHAR(LOG_ACCESS_TIME,'YYYYMMDDHH24'),'YYYYMMDDHH24')
+      </if>
+      <if test="statType == 'byMinute'">
+        TO_TIMESTAMP(TO_CHAR(LOG_ACCESS_TIME,'YYYYMMDDHH24MI'),'YYYYMMDDHH24MI')
+      </if>
+      AS LOG_ACCESS_TIME
+    </if>
+    FROM SYS_ACCESS_LOG
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="startTime != null and endTime !=null">
+        AND LOG_ACCESS_TIME BETWEEN #{startTime} AND #{endTime}
+      </if>
+    </trim>
+    ) T GROUP BY LOG_ACCESS_TIME
+    ORDER BY LOG_ACCESS_TIME
+  </select>
+
+</mapper>

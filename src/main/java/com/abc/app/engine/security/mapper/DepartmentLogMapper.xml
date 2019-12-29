@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.security.mapper.DepartmentLogMapper">
+
+  <resultMap id="departmentLogMap" type="com.abc.app.engine.security.entity.DepartmentLog">
+    <id property="logId" column="LOG_ID" />
+    <result property="logType" column="LOG_TYPE" />
+    <result property="logTime" column="LOG_TIME" />
+    <result property="logUser" column="LOG_USER" />
+    <association property="department" resultMap="com.abc.app.engine.security.mapper.DepartmentMapper.departmentMap" />
+  </resultMap>
+
+  <!-- 查询部门日志列表 -->
+  <sql id="findDepartmentLogListSql">
+    FROM SYS_DPT_LOG
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND (DPT_NAME LIKE #{searchAll}
+        OR DPT_CODE LIKE #{searchAll})
+      </if>
+      <if test="id != null">
+        AND DPT_ID=#{id}
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findDepartmentLogList" parameterType="com.abc.app.engine.security.entity.DepartmentLog" resultMap="departmentLogMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findDepartmentLogListSql"></include>
+    ORDER BY LOG_TIME DESC
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findDepartmentLogListCount" parameterType="com.abc.app.engine.security.entity.DepartmentLog" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findDepartmentLogListSql"></include>
+  </select>
+
+  <!-- 根据部门日志ID查询部门日志 -->
+  <select id="findDepartmentLogByLogId" parameterType="long" resultMap="departmentLogMap">
+    SELECT * FROM SYS_DPT_LOG WHERE LOG_ID=#{val}
+  </select>
+
+  <!-- 添加部门日志 -->
+  <sql id="insertDepartmentLogsColumnsSql">
+    LOG_TYPE,LOG_TIME,LOG_USER,
+    DPT_ID,DPT_PID,DPT_NAME,
+    DPT_CODE,DPT_PHONE,DPT_ADDR,
+    DPT_ORDER,DPT_ENABLE,DPT_NOTE
+  </sql>
+
+  <sql id="insertDepartmentLogsValuesSql">
+    #{logType,jdbcType=VARCHAR},
+    #{logTime,jdbcType=TIMESTAMP},
+    #{logUser,jdbcType=VARCHAR},
+    DPT_ID,DPT_PID,DPT_NAME,
+    DPT_CODE,DPT_PHONE,DPT_ADDR,
+    DPT_ORDER,DPT_ENABLE,DPT_NOTE
+  </sql>
+
+  <sql id="insertDepartmentLogsWhereSql">
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="ids == null">
+        AND DPT_ID=#{id}
+      </if>
+      <if test="ids != null">
+        <foreach item="subList" collection="ids">
+          OR DPT_ID IN
+          <foreach item="item" collection="subList" separator="," open="(" close=")">
+            #{item}
+          </foreach>
+        </foreach>
+      </if>
+    </trim>
+  </sql>
+
+  <insert id="insertDepartmentLogs" parameterType="com.abc.app.engine.security.entity.DepartmentLog" databaseId="oracle">
+    INSERT INTO SYS_DPT_LOG (LOG_ID,<include refid="insertDepartmentLogsColumnsSql"></include>)
+    SELECT SEQ_SYS_DPT_LOG.NEXTVAL,<include refid="insertDepartmentLogsValuesSql"></include>
+    FROM SYS_DPT <include refid="insertDepartmentLogsWhereSql"></include>
+  </insert>
+
+  <insert id="insertDepartmentLogs" parameterType="com.abc.app.engine.security.entity.DepartmentLog" databaseId="mysql">
+    INSERT INTO SYS_DPT_LOG (<include refid="insertDepartmentLogsColumnsSql"></include>)
+    SELECT <include refid="insertDepartmentLogsValuesSql"></include>
+    FROM SYS_DPT <include refid="insertDepartmentLogsWhereSql"></include>
+  </insert>
+
+  <insert id="insertDepartmentLogs" parameterType="com.abc.app.engine.security.entity.DepartmentLog" databaseId="pgsql">
+    INSERT INTO SYS_DPT_LOG (LOG_ID,<include refid="insertDepartmentLogsColumnsSql"></include>)
+    SELECT NEXTVAL('SEQ_SYS_DPT_LOG'),<include refid="insertDepartmentLogsValuesSql"></include>
+    FROM SYS_DPT <include refid="insertDepartmentLogsWhereSql"></include>
+  </insert>
+
+</mapper>

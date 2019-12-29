@@ -1,0 +1,165 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.security.mapper.DepartmentMapper">
+
+  <resultMap id="departmentMap" type="com.abc.app.engine.security.entity.Department">
+    <id property="id" column="DPT_ID" />
+    <result property="parentId" column="DPT_PID" />
+    <result property="name" column="DPT_NAME" />
+    <result property="code" column="DPT_CODE" />
+    <result property="phone" column="DPT_PHONE" />
+    <result property="address" column="DPT_ADDR" />
+    <result property="order" column="DPT_ORDER" />
+    <result property="enable" column="DPT_ENABLE" />
+    <result property="note" column="DPT_NOTE" />
+  </resultMap>
+
+  <!-- 查询部门列表 -->
+  <sql id="findDepartmentListSql">
+    FROM SYS_DPT
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND (DPT_NAME LIKE #{searchAll}
+        OR DPT_CODE LIKE #{searchAll})
+      </if>
+      <if test="enable != null">
+        AND DPT_ENABLE=#{enableInt}
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findDepartmentList" parameterType="com.abc.app.engine.security.entity.Department" resultMap="departmentMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findDepartmentListSql"></include>
+    ORDER BY DPT_ORDER
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findDepartmentListCount" parameterType="com.abc.app.engine.security.entity.Department" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findDepartmentListSql"></include>
+  </select>
+
+  <!-- 根据部门ID查询部门 -->
+  <select id="findDepartmentById" parameterType="long" resultMap="departmentMap">
+    SELECT * FROM SYS_DPT WHERE DPT_ID=#{val}
+  </select>
+
+  <!-- 根据部门父ID查询子级总数 -->
+  <select id="findDepartmentChildrenCount" parameterType="long" resultType="long">
+    SELECT COUNT(1) FROM SYS_DPT WHERE DPT_PID=#{val}
+  </select>
+
+  <!-- 根据部门ID查询部门关联用户总数 -->
+  <select id="findDepartmentUserCount" parameterType="long" resultType="long">
+    SELECT COUNT(1) FROM SYS_USER WHERE DPT_ID=#{val}
+  </select>
+
+  <!-- 根据部门父ID查询子级最大ORDER -->
+  <select id="findDepartmentChildrenMaxOrder" parameterType="long" resultType="string">
+    SELECT MAX(DPT_ORDER) FROM SYS_DPT WHERE DPT_PID=#{val}
+  </select>
+
+  <!-- 添加部门 -->
+  <sql id="insertDepartmentColumnsSql">
+    DPT_PID,DPT_NAME,DPT_CODE,
+    DPT_PHONE,DPT_ADDR,DPT_ORDER,
+    DPT_ENABLE,DPT_NOTE
+  </sql>
+
+  <sql id="insertDepartmentValuesSql">
+    #{parentId,jdbcType=NUMERIC},#{name,jdbcType=VARCHAR},#{code,jdbcType=VARCHAR},
+    #{phone,jdbcType=VARCHAR},#{address,jdbcType=VARCHAR},#{order,jdbcType=VARCHAR},
+    #{enableInt,jdbcType=NUMERIC},#{note,jdbcType=VARCHAR}
+  </sql>
+
+  <insert id="insertDepartment" parameterType="com.abc.app.engine.security.entity.Department" databaseId="oracle">
+    INSERT INTO SYS_DPT (DPT_ID,<include refid="insertDepartmentColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertDepartmentValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="oracle">
+      SELECT SEQ_SYS_DPT.NEXTVAL AS ID FROM DUAL
+    </selectKey>
+  </insert>
+
+  <insert id="insertDepartment" parameterType="com.abc.app.engine.security.entity.Department" databaseId="mysql">
+    INSERT INTO SYS_DPT (<include refid="insertDepartmentColumnsSql"></include>)
+    VALUES (<include refid="insertDepartmentValuesSql"></include>)
+    <selectKey resultType="long" order="AFTER" keyProperty="id" databaseId="mysql">
+      SELECT LAST_INSERT_ID() AS ID
+    </selectKey>
+  </insert>
+
+  <insert id="insertDepartment" parameterType="com.abc.app.engine.security.entity.Department" databaseId="pgsql">
+    INSERT INTO SYS_DPT (DPT_ID,<include refid="insertDepartmentColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertDepartmentValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="pgsql">
+      SELECT NEXTVAL('SEQ_SYS_DPT') AS ID
+    </selectKey>
+  </insert>
+
+  <!-- 根据部门ID修改部门 -->
+  <update id="updateDepartmentById" parameterType="com.abc.app.engine.security.entity.Department">
+    UPDATE SYS_DPT SET
+    DPT_NAME=#{name,jdbcType=VARCHAR},DPT_CODE=#{code,jdbcType=VARCHAR},DPT_PHONE=#{phone,jdbcType=VARCHAR},
+    DPT_ADDR=#{address,jdbcType=VARCHAR},DPT_ENABLE=#{enableInt,jdbcType=NUMERIC},DPT_NOTE=#{note,jdbcType=VARCHAR}
+    WHERE DPT_ID=#{id}
+  </update>
+
+  <!-- 根据部门ID删除部门 -->
+  <delete id="deleteDepartmentById" parameterType="long">
+    DELETE FROM SYS_DPT WHERE DPT_ID=#{val}
+  </delete>
+
+  <!-- 根据部门排序查询部门列表 -->
+  <select id="findDepartmentListByOrder" parameterType="com.abc.app.engine.security.entity.Department" resultMap="departmentMap">
+    SELECT * FROM SYS_DPT
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="parentOrder != null">
+        AND DPT_ORDER LIKE #{parentOrderRight}
+      </if>
+      <if test="order != null">
+        AND DPT_ORDER<![CDATA[>]]>#{order}
+      </if>
+    </trim>
+    ORDER BY DPT_ORDER
+  </select>
+
+  <!-- 根据部门ID更新部门排序 -->
+  <update id="updateDepartmentOrderByIds" parameterType="list">
+    UPDATE SYS_DPT
+    <trim prefix="SET" suffixOverrides=",">
+      <trim prefix="DPT_ORDER=CASE" suffix="END,">
+        <foreach item="subList" collection="list">
+          <foreach item="item" collection="subList">
+            WHEN DPT_ID=#{item.id} THEN #{item.order}
+          </foreach>
+        </foreach>
+      </trim>
+    </trim>
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <foreach item="subList" collection="list">
+        OR DPT_ID IN
+        <foreach item="item" collection="subList" separator="," open="(" close=")">
+          #{item.id}
+        </foreach>
+      </foreach>
+    </trim>
+  </update>
+
+</mapper>

@@ -1,0 +1,187 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.security.mapper.RoleMapper">
+
+  <resultMap id="roleMap" type="com.abc.app.engine.security.entity.Role">
+    <id property="id" column="ROLE_ID" />
+    <result property="name" column="ROLE_NAME" />
+    <result property="code" column="ROLE_CODE" />
+    <result property="order" column="ROLE_ORDER" />
+    <result property="enable" column="ROLE_ENABLE" />
+    <result property="note" column="ROLE_NOTE" />
+  </resultMap>
+
+  <resultMap id="roleMenuMap" type="com.abc.app.engine.security.entity.RoleMenu">
+    <result property="roleId" column="ROLE_ID" />
+    <result property="menuId" column="MENU_ID" />
+  </resultMap>
+
+  <resultMap id="roleUserMap" type="com.abc.app.engine.security.entity.RoleUser">
+    <result property="roleId" column="ROLE_ID" />
+    <result property="userId" column="USER_ID" />
+  </resultMap>
+
+  <!-- 查询角色列表 -->
+  <sql id="findRoleListSql">
+    FROM SYS_ROLE
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND (ROLE_NAME LIKE #{searchAll}
+        OR ROLE_CODE LIKE #{searchAll})
+      </if>
+      <if test="enable != null">
+        AND ROLE_ENABLE=#{enableInt}
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findRoleList" parameterType="com.abc.app.engine.security.entity.Role" resultMap="roleMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findRoleListSql"></include>
+    ORDER BY ROLE_ORDER
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findRoleListCount" parameterType="com.abc.app.engine.security.entity.Role" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findRoleListSql"></include>
+  </select>
+
+  <!-- 根据ID查询角色 -->
+  <select id="findRoleById" parameterType="long" resultMap="roleMap">
+    SELECT * FROM SYS_ROLE WHERE ROLE_ID=#{val}
+  </select>
+
+  <!-- 根据ID查询菜单总数 -->
+  <select id="findRoleMenuCount" parameterType="long" resultType="long">
+    SELECT COUNT(1) FROM SYS_ROLE_MENU WHERE ROLE_ID=#{val}
+  </select>
+
+  <!-- 根据ID查询用户总数 -->
+  <select id="findRoleUserCount" parameterType="long" resultType="long">
+    SELECT COUNT(1) FROM SYS_ROLE_USER WHERE ROLE_ID=#{val}
+  </select>
+
+  <!-- 根据ID查询角色菜单列表 -->
+  <select id="findRoleMenuCheckList" parameterType="long" resultMap="com.abc.app.engine.security.mapper.MenuMapper.menuMap">
+    SELECT SM.*,(SELECT COUNT(1) FROM SYS_ROLE_MENU
+    WHERE ROLE_ID=#{val} AND MENU_ID=SM.MENU_ID) AS MENU_CHECKED
+    FROM SYS_MENU SM ORDER BY SM.MENU_ORDER
+  </select>
+
+  <!-- 根据ID查询角色用户列表 -->
+  <select id="findRoleUserCheckList" parameterType="long" resultMap="com.abc.app.engine.security.mapper.UserMapper.userMap">
+    SELECT SU.*,(SELECT COUNT(1) FROM SYS_ROLE_USER
+    WHERE ROLE_ID=#{val} AND USER_ID=SU.USER_ID) AS USER_CHECKED
+    FROM SYS_USER SU WHERE SU.DPT_ID!=0
+    <if test="_databaseId == 'oracle'">
+      ORDER BY SU.USER_NAME
+    </if>
+    <if test="_databaseId == 'mysql'">
+      ORDER BY CONVERT(SU.USER_NAME USING GBK)
+    </if>
+    <if test="_databaseId == 'pgsql'">
+      ORDER BY SU.USER_NAME COLLATE "zh-x-icu"
+    </if>
+  </select>
+
+  <!-- 查询用户角色 -->
+  <select id="findRoleListByUsername" parameterType="string" resultMap="roleMap">
+    SELECT SR.* FROM SYS_ROLE SR WHERE SR.ROLE_ENABLE=1 AND EXISTS
+    (SELECT 1 FROM SYS_ROLE_USER SRU,SYS_USER SU
+    WHERE SR.ROLE_ID=SRU.ROLE_ID AND SRU.USER_ID=SU.USER_ID
+    AND SU.USER_ENABLE=1 AND SU.USERNAME=#{val})
+    ORDER BY SR.ROLE_ORDER
+  </select>
+
+  <!-- 添加角色 -->
+  <sql id="insertRoleColumnsSql">
+    ROLE_NAME,ROLE_CODE,
+    ROLE_ORDER,ROLE_ENABLE,ROLE_NOTE
+  </sql>
+
+  <sql id="insertRoleValuesSql">
+    #{name,jdbcType=VARCHAR},#{code,jdbcType=VARCHAR},
+    #{order,jdbcType=NUMERIC},#{enableInt},#{note,jdbcType=VARCHAR}
+  </sql>
+
+  <insert id="insertRole" parameterType="com.abc.app.engine.security.entity.Role" databaseId="oracle">
+    INSERT INTO SYS_ROLE (ROLE_ID,<include refid="insertRoleColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertRoleValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="oracle">
+      SELECT SEQ_SYS_ROLE.NEXTVAL AS ID FROM DUAL
+    </selectKey>
+  </insert>
+
+  <insert id="insertRole" parameterType="com.abc.app.engine.security.entity.Role" databaseId="mysql">
+    INSERT INTO SYS_ROLE (<include refid="insertRoleColumnsSql"></include>)
+    VALUES (<include refid="insertRoleValuesSql"></include>)
+    <selectKey resultType="long" order="AFTER" keyProperty="id" databaseId="mysql">
+      SELECT LAST_INSERT_ID()  AS ID
+    </selectKey>
+  </insert>
+
+  <insert id="insertRole" parameterType="com.abc.app.engine.security.entity.Role" databaseId="pgsql">
+    INSERT INTO SYS_ROLE (ROLE_ID,<include refid="insertRoleColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertRoleValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="pgsql">
+      SELECT NEXTVAL('SEQ_SYS_ROLE') AS ID
+    </selectKey>
+  </insert>
+
+  <!-- 根据ID修改角色 -->
+  <update id="updateRoleById" parameterType="com.abc.app.engine.security.entity.Role">
+    UPDATE SYS_ROLE SET ROLE_NAME=#{name,jdbcType=VARCHAR},ROLE_CODE=#{code,jdbcType=VARCHAR},
+    ROLE_ORDER=#{order,jdbcType=NUMERIC},ROLE_ENABLE=#{enableInt,jdbcType=NUMERIC},ROLE_NOTE=#{note,jdbcType=VARCHAR}
+    WHERE ROLE_ID=#{id}
+  </update>
+
+  <!-- 根据ID删除角色 -->
+  <delete id="deleteRoleById" parameterType="long">
+    DELETE FROM SYS_ROLE WHERE ROLE_ID=#{val}
+  </delete>
+
+  <!-- 根据ID删除角色菜单 -->
+  <delete id="deleteRoleMenuById" parameterType="long">
+    DELETE FROM SYS_ROLE_MENU WHERE ROLE_ID=#{val}
+  </delete>
+
+  <!-- 根据ID删除角色用户 -->
+  <delete id="deleteRoleUserById" parameterType="long">
+    DELETE FROM SYS_ROLE_USER WHERE ROLE_ID=#{val}
+    AND USER_ID IN (SELECT USER_ID FROM SYS_USER WHERE DPT_ID!=0)
+  </delete>
+
+  <!-- 添加角色菜单 -->
+  <insert id="insertRoleMenu" parameterType="list">
+    INSERT INTO SYS_ROLE_MENU (ROLE_ID,MENU_ID) VALUES
+    <foreach item="item" index="index" collection="list" separator=",">
+      (#{item.roleId},#{item.menuId})
+    </foreach>
+  </insert>
+
+  <!-- 添加角色用户 -->
+  <insert id="insertRoleUser" parameterType="list">
+    INSERT INTO SYS_ROLE_USER (ROLE_ID,USER_ID) VALUES
+    <foreach item="item" index="index" collection="list" separator=",">
+      (#{item.roleId},#{item.userId})
+    </foreach>
+  </insert>
+
+</mapper>

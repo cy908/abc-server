@@ -1,0 +1,116 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.security.mapper.RoleLogMapper">
+
+  <resultMap id="roleLogMap" type="com.abc.app.engine.security.entity.RoleLog">
+    <id property="logId" column="LOG_ID" />
+    <result property="logType" column="LOG_TYPE" />
+    <result property="logTime" column="LOG_TIME" />
+    <result property="logUser" column="LOG_USER" />
+    <association property="role" resultMap="com.abc.app.engine.security.mapper.RoleMapper.roleMap" />
+  </resultMap>
+
+  <!-- 查询角色日志列表 -->
+  <sql id="findRoleLogListSql">
+    FROM SYS_ROLE_LOG
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND (ROLE_NAME LIKE #{searchAll}
+        OR ROLE_CODE LIKE #{searchAll})
+      </if>
+      <if test="id != null">
+        AND ROLE_ID=#{id}
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findRoleLogList" parameterType="com.abc.app.engine.security.entity.RoleLog" resultMap="roleLogMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findRoleLogListSql"></include>
+    ORDER BY LOG_TIME DESC
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findRoleLogListCount" parameterType="com.abc.app.engine.security.entity.RoleLog" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findRoleLogListSql"></include>
+  </select>
+
+  <!-- 根据角色日志ID查询角色日志 -->
+  <select id="findRoleLogByLogId" parameterType="long" resultMap="roleLogMap">
+    SELECT * FROM SYS_ROLE_LOG WHERE LOG_ID=#{val}
+  </select>
+
+  <!-- 添加角色日志 -->
+  <sql id="insertRoleLogsColumnsSql">
+    LOG_TYPE,LOG_TIME,LOG_USER,
+    ROLE_ID,ROLE_NAME,ROLE_CODE,
+    ROLE_ORDER,ROLE_ENABLE,ROLE_NOTE
+  </sql>
+
+  <sql id="insertRoleLogsValuesSql">
+    #{logType,jdbcType=VARCHAR},
+    #{logTime,jdbcType=TIMESTAMP},
+    #{logUser,jdbcType=VARCHAR},
+    ROLE_ID,ROLE_NAME,ROLE_CODE,
+    ROLE_ORDER,ROLE_ENABLE,ROLE_NOTE
+  </sql>
+
+  <sql id="insertRoleLogsWhereSql">
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="ids == null">
+        AND ROLE_ID=#{id}
+      </if>
+      <if test="ids != null">
+        AND ROLE_ID IN
+        <foreach item="item" collection="ids" separator="," open="(" close=")">
+          #{item}
+        </foreach>
+      </if>
+    </trim>
+  </sql>
+
+  <insert id="insertRoleLogs" parameterType="com.abc.app.engine.security.entity.RoleLog" databaseId="oracle">
+    INSERT INTO SYS_ROLE_LOG (LOG_ID,<include refid="insertRoleLogsColumnsSql"></include>)
+    SELECT SEQ_SYS_ROLE_LOG.NEXTVAL,<include refid="insertRoleLogsValuesSql"></include>
+    FROM SYS_ROLE <include refid="insertRoleLogsWhereSql"></include>
+    <selectKey resultType="long" order="AFTER" keyProperty="logId" databaseId="oracle">
+      SELECT SEQ_SYS_ROLE_LOG.CURRVAL AS LOG_ID FROM DUAL
+    </selectKey>
+  </insert>
+
+  <insert id="insertRoleLogs" parameterType="com.abc.app.engine.security.entity.RoleLog" databaseId="mysql">
+    INSERT INTO SYS_ROLE_LOG (<include refid="insertRoleLogsColumnsSql"></include>)
+    SELECT <include refid="insertRoleLogsValuesSql"></include>
+    FROM SYS_ROLE <include refid="insertRoleLogsWhereSql"></include>
+    <selectKey resultType="long" order="AFTER" keyProperty="logId" databaseId="mysql">
+      SELECT LAST_INSERT_ID() AS LOG_ID
+    </selectKey>
+  </insert>
+
+  <insert id="insertRoleLogs" parameterType="com.abc.app.engine.security.entity.RoleLog" databaseId="pgsql">
+    INSERT INTO SYS_ROLE_LOG (LOG_ID,<include refid="insertRoleLogsColumnsSql"></include>)
+    SELECT NEXTVAL('SEQ_SYS_ROLE_LOG'),<include refid="insertRoleLogsValuesSql"></include>
+    FROM SYS_ROLE <include refid="insertRoleLogsWhereSql"></include>
+    <selectKey resultType="long" order="AFTER" keyProperty="logId" databaseId="pgsql">
+      SELECT CURRVAL('SEQ_SYS_ROLE_LOG') AS LOG_ID
+    </selectKey>
+  </insert>
+
+</mapper>

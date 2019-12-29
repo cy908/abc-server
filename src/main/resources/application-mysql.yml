@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    platform: mysql
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    url: jdbc:mysql://127.0.0.1:3306/MYABC?useSSL=true&useUnicode=true&characterEncoding=utf8&autoReconnect=true&allowMultiQueries=true&serverTimezone=GMT%2B8
+    username: root
+    password: mysql
+    schema: classpath:db/schema-mysql.sql
+    data: classpath:db/data.sql
+    initialization-mode: always
+    continue-on-error: true

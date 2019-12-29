@@ -1,0 +1,97 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.abc.app.engine.common.mapper.AccessLogMapper">
+
+  <resultMap id="accessLogMap" type="com.abc.app.engine.common.entity.AccessLog">
+    <id property="id" column="LOG_ID" />
+    <result property="accessTime" column="LOG_ACCESS_TIME" />
+    <result property="accessIP" column="LOG_ACCESS_IP" />
+    <result property="accessUser" column="LOG_ACCESS_USER" />
+    <result property="accessURI" column="LOG_ACCESS_URI" />
+    <result property="accessUA" column="LOG_ACCESS_UA" />
+  </resultMap>
+
+  <!-- 查询访问日志列表 -->
+  <sql id="findAccessLogListSql">
+    FROM SYS_ACCESS_LOG
+    <trim prefix="WHERE" prefixOverrides="AND |OR ">
+      <if test="search != null">
+        AND (LOG_ACCESS_IP LIKE #{searchAll}
+        OR LOG_ACCESS_USER LIKE #{searchAll}
+        OR LOG_ACCESS_URI LIKE #{searchAll})
+      </if>
+      <if test="startTime != null and endTime !=null">
+        AND LOG_ACCESS_TIME BETWEEN #{startTime} AND #{endTime}
+      </if>
+    </trim>
+  </sql>
+
+  <select id="findAccessLogList" parameterType="com.abc.app.engine.common.entity.AccessLog" resultMap="accessLogMap">
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        SELECT * FROM (SELECT T.*,ROWNUM RN FROM (
+      </if>
+    </if>
+    SELECT *
+    <include refid="findAccessLogListSql"></include>
+    ORDER BY LOG_ACCESS_TIME DESC
+    <if test="pageIndex != null and pageSize != null">
+      <if test="_databaseId == 'oracle'">
+        ) T WHERE ROWNUM<![CDATA[<=]]> #{endIndex})
+        WHERE RN <![CDATA[>]]> #{startIndex}
+      </if>
+      <if test="_databaseId == 'mysql'">
+        LIMIT #{startIndex},#{pageSize}
+      </if>
+      <if test="_databaseId == 'pgsql'">
+        LIMIT #{pageSize} OFFSET #{startIndex}
+      </if>
+    </if>
+  </select>
+
+  <select id="findAccessLogListCount" parameterType="com.abc.app.engine.common.entity.AccessLog" resultType="long">
+    SELECT COUNT(1)
+    <include refid="findAccessLogListSql"></include>
+  </select>
+
+  <!-- 根据访问日志ID查询访问日志 -->
+  <select id="findAccessLogById" parameterType="long" resultMap="accessLogMap">
+    SELECT * FROM SYS_ACCESS_LOG WHERE LOG_ID=#{val}
+  </select>
+
+  <!-- 添加访问日志 -->
+  <sql id="insertAccessLogColumnsSql">
+    LOG_ACCESS_TIME,LOG_ACCESS_IP,LOG_ACCESS_USER,
+    LOG_ACCESS_URI,LOG_ACCESS_UA
+  </sql>
+
+  <sql id="insertAccessLogValuesSql">
+    #{accessTime,jdbcType=TIMESTAMP},#{accessIP,jdbcType=VARCHAR},#{accessUser,jdbcType=VARCHAR},
+    #{accessURI,jdbcType=VARCHAR},#{accessUA,jdbcType=VARCHAR}
+  </sql>
+
+  <insert id="insertAccessLog" parameterType="com.abc.app.engine.common.entity.AccessLog" databaseId="oracle">
+    INSERT INTO SYS_ACCESS_LOG (LOG_ID,<include refid="insertAccessLogColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertAccessLogValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="oracle">
+      SELECT SEQ_SYS_ACCESS_LOG.NEXTVAL AS ID FROM DUAL
+    </selectKey>
+  </insert>
+
+  <insert id="insertAccessLog" parameterType="com.abc.app.engine.common.entity.AccessLog" databaseId="mysql">
+    INSERT INTO SYS_ACCESS_LOG (<include refid="insertAccessLogColumnsSql"></include>)
+    VALUES (<include refid="insertAccessLogValuesSql"></include>)
+    <selectKey resultType="long" order="AFTER" keyProperty="id" databaseId="mysql">
+      SELECT LAST_INSERT_ID() AS ID
+    </selectKey>
+  </insert>
+
+  <insert id="insertAccessLog" parameterType="com.abc.app.engine.common.entity.AccessLog" databaseId="pgsql">
+    INSERT INTO SYS_ACCESS_LOG (LOG_ID,<include refid="insertAccessLogColumnsSql"></include>)
+    VALUES (#{id},<include refid="insertAccessLogValuesSql"></include>)
+    <selectKey resultType="long" order="BEFORE" keyProperty="id" databaseId="pgsql">
+      SELECT NEXTVAL('SEQ_SYS_ACCESS_LOG') AS ID
+    </selectKey>
+  </insert>
+
+</mapper>

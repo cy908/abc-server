@@ -1,0 +1,6 @@
+spring:
+  profiles:
+    active: mysql
+
+logging.level:
+  com.abc.app: DEBUG
