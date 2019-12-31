@@ -2,8 +2,8 @@ package com.abc.app.engine.common.util;
 
 import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.Base64;
-import java.util.stream.Stream;
 
 import javax.crypto.Cipher;
 import javax.crypto.spec.IvParameterSpec;
@@ -16,10 +16,6 @@ import lombok.extern.slf4j.Slf4j;
 /**
  * AES加解密工具
  * 
- * <p>
- * 密码128、192、256位，即16、24、32字节
- * </p>
- * 
  * @author 陈勇
  * @date 2019年6月27日
  *
@@ -27,29 +23,34 @@ import lombok.extern.slf4j.Slf4j;
 @Slf4j
 public class AESUtil {
 
-    public static final int DEFAULT_KEY_SIZE = 16;
+    public static final int[] KEY_SIZES = { 16 };
+    public static final int KEY_SIZE = 16;
 
     private static final String ALGORITHM = "AES";
     private static final String TRANSFORMATION = "AES/CBC/PKCS5Padding";
     private static final Charset UTF_8 = StandardCharsets.UTF_8;
 
     /**
-     * 初始化密码 {@link #DEFAULT_KEY_SIZE}
+     * 初始化密钥 {@link #DEFAULT_KEY_SIZE}
      * 
      * @return
      */
     public static String initKey() {
-        return initKey(DEFAULT_KEY_SIZE);
+        return initKey(KEY_SIZE);
     }
 
     /**
-     * 初始化密码
+     * 初始化密钥
      * 
      * @param keysize
      * @return
      */
     public static String initKey(int keysize) {
-        return RandomStringUtils.randomAlphabetic(keysize);
+        if (Arrays.stream(KEY_SIZES).noneMatch(item -> item == keysize)) {
+            log.error("密钥长度错误！");
+            return null;
+        }
+        return RandomStringUtils.randomAlphanumeric(keysize);
     }
 
     /**
@@ -86,8 +87,8 @@ public class AESUtil {
         if (content == null || password == null) {
             return null;
         }
-        if (Stream.of(16, 24, 32).noneMatch(item -> item.equals(password.getBytes(UTF_8).length))) {
-            log.error("密码长度应为16、24或32字节：当前密码长度为{}字节！", password.getBytes(UTF_8).length);
+        if (Arrays.stream(KEY_SIZES).noneMatch(item -> item == password.length())) {
+            log.error("密钥长度错误！");
             return null;
         }
         try {
